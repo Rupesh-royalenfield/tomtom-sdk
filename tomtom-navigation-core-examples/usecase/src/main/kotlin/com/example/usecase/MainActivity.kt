@@ -14,58 +14,76 @@ package com.example.usecase
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
+import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+
 import com.example.usecase.BuildConfig.TOMTOM_API_KEY
+import com.google.android.gms.maps.model.LatLng
+import com.tomtom.quantity.Distance
+import com.tomtom.sdk.common.Cancellable
+import com.tomtom.sdk.common.Result
 import com.tomtom.sdk.datamanagement.navigationtile.NavigationTileStore
 import com.tomtom.sdk.datamanagement.navigationtile.NavigationTileStoreConfiguration
 import com.tomtom.sdk.location.GeoLocation
 import com.tomtom.sdk.location.GeoPoint
 import com.tomtom.sdk.location.LocationProvider
 import com.tomtom.sdk.location.OnLocationUpdateListener
+import com.tomtom.sdk.location.Place
 import com.tomtom.sdk.location.android.AndroidLocationProvider
 import com.tomtom.sdk.location.mapmatched.MapMatchedLocationProvider
 import com.tomtom.sdk.location.simulation.SimulationLocationProvider
 import com.tomtom.sdk.location.simulation.strategy.InterpolationStrategy
 import com.tomtom.sdk.map.display.MapOptions
 import com.tomtom.sdk.map.display.TomTomMap
-import com.tomtom.sdk.map.display.camera.CameraTrackingMode
 import com.tomtom.sdk.map.display.camera.CameraChangeListener
 import com.tomtom.sdk.map.display.camera.CameraOptions
+import com.tomtom.sdk.map.display.camera.CameraTrackingMode
+import com.tomtom.sdk.map.display.common.WidthByZoom
 import com.tomtom.sdk.map.display.common.screen.Padding
 import com.tomtom.sdk.map.display.gesture.MapLongClickListener
 import com.tomtom.sdk.map.display.location.LocationMarkerOptions
+import com.tomtom.sdk.map.display.polyline.PolylineOptions
 import com.tomtom.sdk.map.display.route.Instruction
 import com.tomtom.sdk.map.display.route.RouteClickListener
 import com.tomtom.sdk.map.display.route.RouteOptions
 import com.tomtom.sdk.map.display.ui.MapFragment
 import com.tomtom.sdk.map.display.ui.currentlocation.CurrentLocationButton.VisibilityPolicy
 import com.tomtom.sdk.navigation.ActiveRouteChangedListener
+import com.tomtom.sdk.navigation.NavigationOptions
 import com.tomtom.sdk.navigation.ProgressUpdatedListener
 import com.tomtom.sdk.navigation.RoutePlan
 import com.tomtom.sdk.navigation.TomTomNavigation
 import com.tomtom.sdk.navigation.online.Configuration
 import com.tomtom.sdk.navigation.online.OnlineTomTomNavigationFactory
-import com.tomtom.sdk.navigation.routereplanner.RouteReplanner
-import com.tomtom.sdk.navigation.routereplanner.online.OnlineRouteReplannerFactory
 import com.tomtom.sdk.navigation.ui.NavigationFragment
 import com.tomtom.sdk.navigation.ui.NavigationUiOptions
 import com.tomtom.sdk.routing.RoutePlanner
 import com.tomtom.sdk.routing.RoutePlanningCallback
 import com.tomtom.sdk.routing.RoutePlanningResponse
 import com.tomtom.sdk.routing.RoutingFailure
+import com.tomtom.sdk.routing.online.OnlineRoutePlanner
 import com.tomtom.sdk.routing.options.Itinerary
+import com.tomtom.sdk.routing.options.ItineraryPoint
+import com.tomtom.sdk.routing.options.RouteLegOptions
 import com.tomtom.sdk.routing.options.RoutePlanningOptions
 import com.tomtom.sdk.routing.options.guidance.ExtendedSections
 import com.tomtom.sdk.routing.options.guidance.GuidanceOptions
 import com.tomtom.sdk.routing.options.guidance.InstructionPhoneticsType
-import com.tomtom.sdk.routing.online.OnlineRoutePlanner
 import com.tomtom.sdk.routing.route.Route
 import com.tomtom.sdk.vehicle.Vehicle
 import com.tomtom.sdk.vehicle.VehicleProviderFactory
+import io.ticofab.androidgpxparser.parser.GPXParser
+import io.ticofab.androidgpxparser.parser.domain.Extensions
+import io.ticofab.androidgpxparser.parser.domain.Gpx
+import org.xmlpull.v1.XmlPullParserException
+import java.io.IOException
+import java.io.InputStream
 
 /**
  * This example shows how to build a simple navigation application using the TomTom Navigation SDK for Android.
@@ -73,7 +91,7 @@ import com.tomtom.sdk.vehicle.VehicleProviderFactory
  * Navigation is started in a simulation mode, once the user taps on the route.
  * The application will display upcoming manoeuvres, remaining distance, estimated time of arrival (ETA), current speed, and speed limit information.
  *
- * For more details on this example, check out the tutorial: https://developer.tomtom.com/android/navigation/documentation/tutorials/navigation-use-case
+ * For more details on this example, check out the tutorial: https://developer.tomtom.com/navigation/android/build-a-navigation-app/building-a-navigation-app
  **/
 
 class MainActivity : AppCompatActivity() {
@@ -99,6 +117,106 @@ class MainActivity : AppCompatActivity() {
         initLocationProvider()
         initRouting()
         initNavigation()
+        val button = findViewById<Button>(R.id.click)
+
+        // operations to be performed
+        // when user tap on the button
+        button?.setOnClickListener()
+        {
+            initGpx()
+        }
+    }
+
+    private fun initGpx() {
+        val parser = GPXParser()
+
+        try {
+            val input: InputStream = getAssets().open("test.gpx")
+            val parsedGpx: Gpx? = parser.parse(input)
+            if (parsedGpx != null) {
+                var tracks = parsedGpx.tracks?.map { trk ->
+                    trk.trackSegments.map { trkseg ->
+                        trkseg.trackPoints.map { point ->
+                            GeoPoint(point.latitude, point.longitude)
+                        }
+                    }
+                }!!
+                routeplaner(tracks.first())
+
+
+            }
+
+
+        } catch (e: IOException) {
+            // do something with this exception
+            e.printStackTrace()
+        } catch (e: XmlPullParserException) {
+            // do something with this exception
+            e.printStackTrace()
+        }
+
+    }
+    fun routeplaner(track: List<List<GeoPoint>>){
+
+        val routeOptions = RouteOptions(
+            geometry = track.first(),
+            color = Color.BLUE,
+            outlineWidth = 3.0,
+            widths = listOf(WidthByZoom(5.0)),
+            progress = Distance.meters(1000.0),
+            instructions = listOf(
+                Instruction(
+                    routeOffset = Distance.meters(1000.0),
+                    combineWithNext = false
+                ),
+                Instruction(
+                    routeOffset = Distance.meters(2000.0),
+                    combineWithNext = true
+                ),
+                Instruction(routeOffset = Distance.meters(3000.0))
+            ),
+            tag = "Extra information about the route",
+            departureMarkerVisible = true,
+            destinationMarkerVisible = true
+        )
+        Log.i("check routeOptions",routeOptions.toString())
+        tomTomMap.addRoute(routeOptions)
+        val waypoints = track.first()
+        val itinerary = Itinerary(
+            origin = GeoPoint(track.first().first().latitude,track.first().first().longitude),
+            destination =GeoPoint(track.last().last().latitude,track.last().last().longitude),
+            waypoints
+        )
+        val routePlanningOptions = RoutePlanningOptions(
+            itinerary
+        )
+
+        Log.i("routeplan",routePlanningOptions.toString())
+
+        routePlanner.planRoute(routePlanningOptions,object :RoutePlanningCallback{
+            override fun onFailure(failure: RoutingFailure) {
+                Log.e("TAG", "Unable to calculate a route: " + failure.message)
+            }
+
+            override fun onRoutePlanned(route: Route) =Unit
+
+            override fun onSuccess(result: RoutePlanningResponse) {
+                route = result.routes.first()
+                initNavigationFragment()
+                navigationFragment.setTomTomNavigation(tomTomNavigation)
+                val routePlan = RoutePlan(route!!, routePlanningOptions)
+                Log.i("check", route.toString())
+                navigationFragment.startNavigation(routePlan)
+                navigationFragment.addNavigationListener(navigationListener)
+                tomTomNavigation.addProgressUpdatedListener(progressUpdatedListener)
+                tomTomNavigation.addActiveRouteChangedListener(activeRouteChangedListener)
+                Log.i("hi",route.toString())
+            }
+
+        })
+
+        Log.i("ji",routePlanningOptions.itinerary.origin.toString())
+
     }
 
     /**
@@ -324,6 +442,7 @@ class MainActivity : AppCompatActivity() {
         initNavigationFragment()
         navigationFragment.setTomTomNavigation(tomTomNavigation)
         val routePlan = RoutePlan(route, routePlanningOptions)
+        Log.i("check", route.toString())
         navigationFragment.startNavigation(routePlan)
         navigationFragment.addNavigationListener(navigationListener)
         tomTomNavigation.addProgressUpdatedListener(progressUpdatedListener)
@@ -493,6 +612,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         tomTomMap.setLocationProvider(null)
+        supportFragmentManager.beginTransaction().remove(navigationFragment).commitNowAllowingStateLoss()
         super.onDestroy()
         tomTomNavigation.close()
         navigationTileStore.close()

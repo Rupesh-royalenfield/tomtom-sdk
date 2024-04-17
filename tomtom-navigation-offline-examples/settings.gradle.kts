@@ -14,8 +14,8 @@ rootProject.name = "tomtom-sdk-examples"
 fun RepositoryHandler.tomtomArtifactory() {
     maven("https://repositories.tomtom.com/artifactory/maven") {
         credentials {
-            username = extra["repositoriesTomtomComUsername"].toString()
-            password = extra["repositoriesTomtomComPassword"].toString()
+            username = "mohamed@royalenfield.com".toString()
+            password = "Proceed@123".toString()
         }
         content { includeGroupByRegex("com\\.tomtom\\..+") }
     }

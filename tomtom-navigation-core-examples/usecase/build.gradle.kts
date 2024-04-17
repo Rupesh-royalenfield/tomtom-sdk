@@ -16,11 +16,11 @@ plugins {
 
 android {
     namespace = "com.example.usecase"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 26
-        targetSdk = 33
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "TOMTOM_API_KEY", "\"${extra["tomtomApiKey"].toString()}\"")
@@ -47,12 +47,15 @@ dependencies {
     implementation(libs.locationProvider)
     implementation(libs.locationSimulation)
     implementation(libs.locationMapmatched)
-    implementation(libs.mapsDisplay)
+    implementation("com.tomtom.sdk.maps:map-display:0.50.6")
+    implementation("com.github.ticofab:android-gpx-parser:v2.2.0")
     implementation(libs.navigationOnline)
     implementation(libs.navigationUi)
     implementation(libs.routePlannerOnline)
     implementation(libs.routeReplannerOnline)
-
     // Android dependencies.
     implementation(libs.bundles.androidCommon)
+    implementation(libs.material)
+    implementation(libs.activity)
+    implementation(libs.playServicesMaps)
 }

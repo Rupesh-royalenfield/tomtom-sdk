@@ -22,6 +22,7 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
+
     }
 }
 
@@ -31,6 +32,8 @@ dependencyResolutionManagement {
         tomtomArtifactory()
         google()
         mavenCentral()
+        maven {
+            url=uri("https://jitpack.io")}
     }
 }
 
